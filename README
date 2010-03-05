@@ -1,0 +1,95 @@
+Nanny is a dependency management tool like Maven, but unlike Maven, Nanny can be used for arbitrary dependencies and is easy to use. Nanny lets you specify dependencies to your project, and Nanny will go ahead and pull in all the dependencies (and everything those dependencies are dependent on) into the _deps folder in your project. Nanny makes it easy to create dependencies and manage dependency versions.
+
+Nanny has a minimum of configuration. We use Nanny at BackType to manage all of our jars (external and internal), distribute custom software builds (like hadoop+confs, cassandra), and we're starting to use it to manage dependencies between our python projects (instead of something like svn externals or git submodules).
+
+
+------------------------------
+SETTING UP YOUR FIRST DEPENDENCY
+After you follow the installation instructions below, you'll have an empty folder on your repository host ready to be used. Let's create the "hello world" of nanny dependency management:
+
+1. Create a folder on your local drive somewhere. Say, "/tmp/helloworld"
+2. cd /tmp/helloworld
+3. echo "hello" > hello.txt
+4. echo "world" > world.txt
+5. echo "helloworld" > CHILD
+6. echo "cp *.txt \$1" > CHILDMAKER
+7. chmod a+x CHILDMAKER
+8. nanny push 1.0.0
+9. Create a new folder on your local drive. Say, "/tmp/dependentproject"
+10. cd "/tmp/dependentproject"
+11. echo "helloworld" > NANNY
+12. nanny deps
+13. cat _deps/helloworld/*
+
+That should be enough for you to get started. More detailed instructions below.
+
+--------------------------
+INSTALLATION:
+
+1. Install Python if you don't already have it
+2. Install paramiko (http://www.lag.net/paramiko/). Easiest way is to "easy_install paramiko".
+3. Put the nanny source code somewhere and fill in _config/nannyconstants.py with the following:
+REPOSITORY_HOST = {HOST WITH THE REPOSITORY}
+REPOSITORY_USER = {USERNAME TO LOG IN AS}
+REPOSITORY_PATH = {PATH TO THE REPOSITORY ON THE HOST}
+
+You need to make sure you can ssh to that machine as that user without typing any passwords (check out public/private keys to accomplish this)
+
+4. Make the REPOSITORY_PATH on REPOSITORY_HOST and make sure REPOSITORY_USER has permissions to read/write from it
+5. You'll probably want to create an executable script called "nanny" and put it somewhere in your path to have it call the python script. It should look something like:
+
+#!/bin/sh
+python /Users/marz/opensource/nanny/nanny.py $*
+
+
+--------------------------
+GUIDE
+------------------------------
+Specifying dependencies:
+
+To create dependencies to Nanny packages from your project, create a NANNY file in the root directory of your project. Each line of the NANNY file specifies a dependency, like so:
+
+thriftjava 1.0.0
+
+The first field specifies what package you want to pull in as a dependency, and the second field indicates the specific version you want to pull in. If you omit the second field, like so:
+
+thriftjava
+
+Nanny will pull in the latest version. Run "nanny deps" to pull in all dependencies into _deps. Nanny will also pull in any dependencies of the dependencies you specify, and the dependencies of those dependencies, and so on.
+
+------------------------------
+Creating Nanny packages:
+
+To turn a project into a Nanny package, you need to do two things: name the package and provide a script to package the project up. For example, let's say you have a project "utils" that you want to package up. To do so, you would create a file called CHILD in the root of your project and create one line with "utils" in it.
+
+echo "utils" > CHILD
+
+Then, you would create an executable script called CHILDMAKER to package your project up. Your script will receive one argument which indicates the directory you should place any files. For example, here's a CHILDMAKER which packages up the jars of a Java project built by ant:
+
+#!/bin/sh
+ant jar
+cp build/*.jar $1
+
+
+One that's setup, type in "nanny push {VERSION}" to push the package to the repository. The version you specify must be of the format {major.minor.revision} and must be greater than what already exists in the repository. To see what's currently in the repository, type in "nanny remote-version"
+
+--------------------------
+Non-fatal Issues with Nanny that should be resolved one day:
+
+1. Nanny's operations are not atomic and the repository is not locked during operations. So if issues come up you'll have to deal with it manually. I haven't run into any problems, but the repository structure is really simple so fixing any problems should be straightforward.
+2. Since Nanny exists outside the context of version control, there's no log associated with each revision and you don't really know what's inside each one. For now, you can write out git log to the packages you create to have an idea of what's inside.
+3. Nanny doesn't integrate with other dependency management systems (except for leiningen - nanny will call lein deps if you have a project.clj file in the directory). I manually install our external dependencies (i.e., maven ones) into nanny packages to unify how we manage things internally. It's a little bit of work that could be eliminated if Nanny was able to communicate with other systems, but not too much of a time investment.
+4. Fault tolerance pretty limited: Nanny doesn't detect when your CHILDMAKER script fails.
+
+
+Patches welcome!
+
+
+--------------------------
+FAQ:
+
+Why is the project called Nanny?
+You hire a nanny to look after your dependents.
+
+
+
