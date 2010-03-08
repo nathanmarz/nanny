@@ -1,4 +1,6 @@
-Nanny is a dependency management tool like Maven, but unlike Maven, Nanny can be used for arbitrary dependencies and is easy to use. Nanny lets you specify dependencies to your project, and Nanny will go ahead and pull in all the dependencies (and everything those dependencies are dependent on) into the _deps folder in your project. Nanny makes it easy to create dependencies and manage dependency versions.
+Nanny is a dependency management tool for managing dependencies between your projects. It is optimized for individuals and small teams. Nanny is like Maven, but unlike Maven, Nanny can be used for arbitrary dependencies and is easy to use. 
+
+Nanny lets you specify dependencies to your project, and Nanny will go ahead and pull in all the dependencies (and everything those dependencies are dependent on) into the _deps folder in your project. Nanny makes it easy to create dependencies and manage dependency versions.
 
 Nanny has a minimum of configuration. We use Nanny at BackType to manage all of our jars (external and internal), distribute custom software builds (like hadoop+confs, cassandra), and we're starting to use it to manage dependencies between our python projects (instead of something like svn externals or git submodules).
 
@@ -21,7 +23,7 @@ After you follow the installation instructions below, you'll have an empty folde
 12. nanny deps
 13. cat _deps/helloworld/*
 
-That should be enough for you to get started. More detailed instructions below.
+That should be enough for you to get started. Type "nanny help" to see all the commands. More detailed instructions below.
 
 --------------------------
 INSTALLATION:

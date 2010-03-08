@@ -241,9 +241,28 @@ def print_help(client, args):
     print ""
     print "versions {childname}: Print the versions available for {childname} in the repository"
     print ""
+    print "stage stagedir [childname]: A 'dry run' of a push. Packages up the package into {stagedir}."
+    print "\twithout pushing. If this package produces multiple children, you need to specify the"
+    print "\t{childname} to package."
+    print ""
     print "help: Print this message"
     print ""
     print ""
+
+def stage(client, args):
+    stagedir = args[0]
+    child_pairs = get_child_info("CHILD")
+    #TODO: DRY this up
+    if len(args) == 1:
+        if len(child_pairs) > 1:
+            raise RuntimeError("Invalid args")
+        name = child_pairs.items()[0][0]
+    else:
+        name = child_pairs[args[1]]
+    makerscript = child_pairs[name]
+    
+    os.mkdir(stagedir)
+    os.system("./%s %s" % (makerscript, stagedir))
 
 def push(client, args):
     child_pairs = get_child_info("CHILD")
@@ -284,7 +303,7 @@ def push(client, args):
 
 
 commands = {"deps": deps, "remote-version": remote_version, "push": push, 
-            "versions": versions, "list": list_available, "help": print_help}
+            "versions": versions, "list": list_available, "stage": stage, "help": print_help}
 sys.argv.pop(0) #remove filename
 command = None
 if len(sys.argv) > 0:
