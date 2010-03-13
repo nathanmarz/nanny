@@ -258,7 +258,7 @@ def stage(client, args):
             raise RuntimeError("Invalid args")
         name = child_pairs.items()[0][0]
     else:
-        name = child_pairs[args[1]]
+        name = args[1]
     makerscript = child_pairs[name]
     
     os.mkdir(stagedir)
