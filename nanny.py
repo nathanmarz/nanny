@@ -31,12 +31,42 @@ from optparse import OptionParser
 from _config.nannyconstants import *
 import sys
 import os
+import subprocess
 import shutil
 
 '''
 TODO: should lock the repository
  - should we just use svn or git as the repository?
 '''
+
+class FailedSyscallError(Exception):
+    def __init__(self, value):
+        self.value = value
+        
+    def __str__(self):
+        return repr(self.value)
+
+#raises an exception if the command returns non-zero
+def syscall_execget(command):
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    exitcode = os.waitpid(process.pid, 0)[1]
+    if exitcode != 0:
+        raise FailedSyscallError(command + " failed with exit code " + str(exitcode))
+    return process.stdout.read().strip()
+
+def get_version_control_logs():
+    COMMANDS = ["svn log && svn log | head -100", "git log && git log | head -100"]
+    for c in COMMANDS:
+        try:
+            return syscall_execget(c)
+        except FailedSyscallError:
+            pass
+    return None
+
+def spit(filename, content):
+    f = open(filename, "w")
+    f.write(content)
+    f.close()
 
 def get_substance(strs):
     return filter(lambda x: len(x) > 0, map(lambda x: x.strip(), strs)) 
@@ -124,7 +154,10 @@ def put(client, local, remote):
         ftp.put(local, remote)
     finally:
         ftp.close()
-        
+
+def get_remote_child_path(name, version):
+    return REPOSITORY_PATH + "/" + name + "/" + version_to_str(version)
+
 def remote_mkdir(client, path):
     ftp = client.open_sftp()
     try:
@@ -156,16 +189,23 @@ def install_dep(client, name, version):
     install_path = "_deps/_actual/" + name + "-" + version_to_str(version)
     os.mkdir(install_path)
     
-    version_path = "%s/%s/%s" %(REPOSITORY_PATH, name, version_to_str(version))
+    version_path = get_remote_child_path(name, version)
     pull(client, version_path + "/dep.tar.gz", install_path + "/dep.tar.gz")
     os.system("cd " + install_path + " && tar xzf dep.tar.gz")
     os.remove(install_path + "/dep.tar.gz")
     os.symlink("_actual/" + name + "-" + version_to_str(version), "_deps/" + name)
 
+def get_remote_file_lines(client, filename):
+    stdin, stdout, stderr = client.exec_command("cat %s" % filename)
+    return stdout.readlines()
+    
+def get_remote_file_contents(client, filename):
+    lines = get_remote_file_lines(client, filename)
+    return "".join(lines)
+
 def get_deps(client, name, version, depsmap):
-    remote_path = REPOSITORY_PATH + "/" + name + "/" + version_to_str(version)
-    stdin, stdout, stderr = client.exec_command("cat %s/NANNY" % remote_path)
-    new_deps = parse_nanny_lines(client, stdout.readlines())    
+    remote_path = get_remote_child_path(name, version)
+    new_deps = parse_nanny_lines(client, get_remote_file_lines(client, "%s/NANNY" % remote_path))    
     print name + " has dependencies " + str(new_deps)
     for dep, v in new_deps.items():
         if dep in depsmap:
@@ -199,7 +239,6 @@ def deps(client, args):
         install_dep(client, name, version)
     if os.path.exists("project.clj"):
         os.system("lein deps")
-    
 
 def get_child_info(file_path):
     lines = get_substance_lines(file_path)
@@ -210,6 +249,55 @@ def get_child_info(file_path):
             pair = [pair[0], "CHILDMAKER"]
         return pair
     return dict(map(parse_pair, lines))
+
+
+#get_remote_file_contents
+#get_remote_child_path
+def child_information(client, args):
+    childname = args[0]
+    allv = get_versions(client, childname)
+    allv.reverse()
+    if len(allv) == 0:
+        print "'%s' does not exist in the repository" % childname
+
+    if len(args) == 2:
+        version = parse_version(args[1])
+    else:
+        version = allv[0]
+    
+    if version not in allv:
+        print "Versions %s of %s does not exist in the repository" % (version_to_str(version), childname)
+        
+    remotepath = get_remote_child_path(childname, version)
+    packagemsg = get_remote_file_contents(client, remotepath + "/PACKAGE-MSG")
+    versionlogs = get_remote_file_contents(client, remotepath + "/VERSIONLOGS")
+    print "--------------------------------------------------------------------------"
+    print "Version control logs:"
+    print ""    
+    print versionlogs
+    print ""
+    print "--------------------------------------------------------------------------"
+    print "Message: " + packagemsg
+    print ""
+    print "--------------------------------------------------------------------------"
+
+def child_history(client, args):
+    childname = args[0]
+    allv = get_versions(client, childname)
+    allv.reverse()
+    if len(allv) == 0:
+        print "'%s' does not exist in the repository" % childname
+    if len(args) == 2:
+        limit = min(int(args[1]), len(allv))
+    else:
+        limit = len(allv)
+    
+    for i in range(0, limit):
+        v = allv[i]
+        remotepath = get_remote_child_path(childname, v)   
+        packagemsg = get_remote_file_contents(client, remotepath + "/PACKAGE-MSG")
+        print version_to_str(v) + ": " + packagemsg
+        print ""
 
 def remote_version(client, args):
     pairs = get_child_info("CHILD")
@@ -232,12 +320,20 @@ def print_help(client, args):
     print "deps: Download all dependencies listed in NANNY file and write them to _deps/ folder. This command"
     print "\twill delete the _deps folder before running."
     print ""
-    print "push [childname] {major.minor.revision}: Upload a new version of this child. {childname} is optional,"
-    print "\tyou only need to specify it if your CHILD file has multiple entries."
+    print "push [childname] {major.minor.revision} [message]: Upload a new version of this child. {childname} is optional,"
+    print "\tyou only need to specify it if your CHILD file has multiple entries. [message] is required and should be a description"
+    print "\tof the changes in this version. push automatically pulls in the most recent svn/git logs and tags the version with that info."
+    print "\tThe version message and version control logs can be viewed with 'info' and 'history' commands"
     print ""
     print "remote-version: List the current version in the repository of the children from this package."
     print ""
     print "list: Print all children available in the repository for installing as dependencies"
+    print ""
+    print "info [childname] {version}: Print the version message and version control logs for version {version} of [childname]"
+    print "\tIf version is not specified, information about most recent version of [childname] is printed."
+    print ""
+    print "history [childname] {limit}: Print the version messages for the last {limit} versions of [childname]."
+    print "\tIf limit is not specified, the entire version history will be printed."
     print ""
     print "versions {childname}: Print the versions available for {childname} in the repository"
     print ""
@@ -266,14 +362,20 @@ def stage(client, args):
 
 def push(client, args):
     child_pairs = get_child_info("CHILD")
-    if len(args) == 1:
+    if len(args) == 2:
         if len(child_pairs) != 1:
             raise RuntimeError("Invalid args")
         name = child_pairs.items()[0][0]
         version = parse_version(args[0])
-    else:
+        packagemsg = args[1]
+    elif len(args) == 3:
         name = args[0]
         version = parse_version(args[1])
+        packagemsg = args[2]
+    else:
+        raise RuntimeError("Wrong number of args " + str(len(args)))
+
+    versionlogs = get_version_control_logs()
     makerscript = child_pairs[name]
     curr_versions = get_versions(client, name)
     if len(curr_versions) > 0 and compare_versions(curr_versions[-1], version) >= 0:
@@ -288,7 +390,7 @@ def push(client, args):
     remote_tmp_path = "/tmp/_nanny-" + name
     client.exec_command("rm -rf " + remote_tmp_path)
     remote_mkdir(client, remote_tmp_path)
-    
+
     if os.path.exists("/tmp/_nanny/NANNY"):
         put(client, "/tmp/_nanny/NANNY", remote_tmp_path + "/NANNY")
         os.remove("/tmp/_nanny/NANNY")        
@@ -297,14 +399,20 @@ def push(client, args):
 
     os.system("cd /tmp/_nanny && tar czf dep.tar.gz *")
     put(client, "/tmp/_nanny/dep.tar.gz", remote_tmp_path + "/dep.tar.gz")
+    if versionlogs is not None:
+        spit("/tmp/_nanny/VERSIONLOGS", versionlogs)
+        put(client, "/tmp/_nanny/VERSIONLOGS", remote_tmp_path + "/VERSIONLOGS")
+    spit("/tmp/_nanny/PACKAGE-MSG", packagemsg)
+    put(client, "/tmp/_nanny/PACKAGE-MSG", remote_tmp_path + "/PACKAGE-MSG")
 
     remote_path = "%s/%s/%s" % (REPOSITORY_PATH, name, version_to_str(version))
     client.exec_command("mv %s %s" % (remote_tmp_path, remote_path))
 
 
 commands = {"deps": deps, "remote-version": remote_version, "push": push, 
-            "versions": versions, "list": list_available, "stage": stage, "help": print_help}
+            "versions": versions, "list": list_available, "stage": stage, "info": child_information, "history": child_history, "help": print_help}
 sys.argv.pop(0) #remove filename
+
 command = None
 if len(sys.argv) > 0:
     command = sys.argv.pop(0)
