@@ -38,10 +38,11 @@ REPOSITORY_PATH = {PATH TO THE REPOSITORY ON THE HOST}
 You need to make sure you can ssh to that machine as that user without typing any passwords (check out public/private keys to accomplish this)
 
 4. Make the REPOSITORY_PATH on REPOSITORY_HOST and make sure REPOSITORY_USER has permissions to read/write from it
-5. You'll probably want to make an alias to "nanny" so you can easily execute it from anywhere. For example, in my ~/.profile I have:
+5. You'll want to create a small shell script in your path so that you can execute nanny globally. It should look something like this (the "$@" requotes arguments so args like "my push message" don't get split up into multiple arguments):
 
-alias nanny="python /Users/marz/opensource/nanny/nanny.py"
+#!/bin/sh
 
+python /Users/marz/opensource/nanny/nanny.py "$@"
 
 ------------------------------
 GUIDE
