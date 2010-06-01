@@ -409,28 +409,32 @@ def push(client, args):
     client.exec_command("mv %s %s" % (remote_tmp_path, remote_path))
 
 
-commands = {"deps": deps, "remote-version": remote_version, "push": push, 
-            "versions": versions, "list": list_available, "stage": stage, "info": child_information, "history": child_history, "help": print_help}
-sys.argv.pop(0) #remove filename
+def main():
+    commands = {"deps": deps, "remote-version": remote_version, "push": push, 
+                "versions": versions, "list": list_available, "stage": stage, "info": child_information, "history": child_history, "help": print_help}
+    sys.argv.pop(0) #remove filename
 
-command = None
-if len(sys.argv) > 0:
-    command = sys.argv.pop(0)
-if command is None or command not in commands:
-    command = "help"
+    command = None
+    if len(sys.argv) > 0:
+        command = sys.argv.pop(0)
+    if command is None or command not in commands:
+        command = "help"
 
-try:
-    if command=="help":
-        client = None
-    else:
-        client = SSHClient()
-        client.load_system_host_keys()
-        client.connect(REPOSITORY_HOST, username=REPOSITORY_USER)
+    try:
+        if command=="help":
+            client = None
+        else:
+            client = SSHClient()
+            client.load_system_host_keys()
+            client.connect(REPOSITORY_HOST, username=REPOSITORY_USER)
     
-    commands[command](client, sys.argv)
-    if command != "help":
-        print ""
-        print command + " [SUCCESSFUL]"
-finally:
-    if client is not None:
-        client.close()
+        commands[command](client, sys.argv)
+        if command != "help":
+            print ""
+            print command + " [SUCCESSFUL]"
+    finally:
+        if client is not None:
+            client.close()
+
+if __name__ == '__main__':
+    main()
