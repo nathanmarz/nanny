@@ -55,7 +55,7 @@ def syscall_execget(command):
     return process.stdout.read().strip()
 
 def get_version_control_logs():
-    COMMANDS = ["svn log && svn log | head -100", "git log -n 1 && git log | head -100"]
+    COMMANDS = ["svn log -l 10", "git log -n 1 && git log | head -100"]
     for c in COMMANDS:
         try:
             return syscall_execget(c)
