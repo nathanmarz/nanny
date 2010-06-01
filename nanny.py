@@ -28,7 +28,19 @@ except Exception, e:
     
 
 from optparse import OptionParser
-from _config.nannyconstants import *
+try:
+    from _config.nannyconstants import *
+except ImportError:
+    from ConfigParser import SafeConfigParser
+    from os.path import expanduser, exists
+
+    nanny_file = expanduser('~/.nanny')
+    if not exists(nanny_file):
+        raise OSError, "File does not exist %s" % nanny_file 
+
+    parser = SafeConfigParser()
+    parser.read(expanduser('~/.nanny'))
+
 import sys
 import os
 import subprocess

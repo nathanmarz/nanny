@@ -29,8 +29,13 @@ That should be enough for you to get started. Type "nanny help" to see all the c
 INSTALLATION:
 
 1. Install Python if you don't already have it
-2. Install paramiko (http://www.lag.net/paramiko/). Easiest way is to "easy_install paramiko".
-3. Put the nanny source code somewhere and fill in _config/nannyconstants.py with the following:
+2. From within the source code directory do the following:
+
+    python setup.py install
+
+3. Create a .nanny config file in your home directory that looks something like this:
+
+[nanny]
 REPOSITORY_HOST = {HOST WITH THE REPOSITORY}
 REPOSITORY_USER = {USERNAME TO LOG IN AS}
 REPOSITORY_PATH = {PATH TO THE REPOSITORY ON THE HOST}
@@ -38,11 +43,6 @@ REPOSITORY_PATH = {PATH TO THE REPOSITORY ON THE HOST}
 You need to make sure you can ssh to that machine as that user without typing any passwords (check out public/private keys to accomplish this)
 
 4. Make the REPOSITORY_PATH on REPOSITORY_HOST and make sure REPOSITORY_USER has permissions to read/write from it
-5. You'll want to create a small shell script in your path so that you can execute nanny globally. It should look something like this (the "$@" requotes arguments so args like "my push message" don't get split up into multiple arguments):
-
-#!/bin/sh
-
-python /Users/marz/opensource/nanny/nanny.py "$@"
 
 ------------------------------
 GUIDE
