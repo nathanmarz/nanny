@@ -28,23 +28,25 @@ except Exception, e:
     
 
 from optparse import OptionParser
-try:
-    from _config.nannyconstants import *
-except ImportError:
-    from ConfigParser import SafeConfigParser
-    from os.path import expanduser, exists
-
-    nanny_file = expanduser('~/.nanny')
-    if not exists(nanny_file):
-        raise OSError, "File does not exist %s" % nanny_file 
-
-    parser = SafeConfigParser()
-    parser.read(expanduser('~/.nanny'))
+from ConfigParser import SafeConfigParser
+from os.path import expanduser, exists
 
 import sys
 import os
 import subprocess
 import shutil
+
+
+nanny_file = expanduser('~/.nanny')
+if not exists(nanny_file):
+    raise OSError, "File does not exist %s" % nanny_file 
+
+parser = SafeConfigParser()
+parser.read(expanduser('~/.nanny'))
+
+REPOSITORY_HOST =  parser.get("nanny", "REPOSITORY_HOST")
+REPOSITORY_USER =  parser.get("nanny", "REPOSITORY_USER")
+REPOSITORY_PATH =  parser.get("nanny", "REPOSITORY_PATH")
 
 '''
 TODO: should lock the repository
