@@ -47,6 +47,10 @@ parser.read(expanduser('~/.nanny'))
 REPOSITORY_HOST =  parser.get("nanny", "REPOSITORY_HOST")
 REPOSITORY_USER =  parser.get("nanny", "REPOSITORY_USER")
 REPOSITORY_PATH =  parser.get("nanny", "REPOSITORY_PATH")
+try:
+	REPOSITORY_KEY = expanduser(parser.get("nanny", "REPOSITORY_KEY"))
+except:
+	REPOSITORY_KEY = None
 
 '''
 TODO: should lock the repository
@@ -440,7 +444,7 @@ def main():
         else:
             client = SSHClient()
             client.load_system_host_keys()
-            client.connect(REPOSITORY_HOST, username=REPOSITORY_USER)
+            client.connect(REPOSITORY_HOST, username=REPOSITORY_USER, key_filename=REPOSITORY_KEY)
     
         commands[command](client, sys.argv)
         if command != "help":
