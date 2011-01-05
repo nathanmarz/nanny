@@ -203,6 +203,26 @@ def install_dep(client, name, version):
         version = allv[-1]
     if version not in allv:
         raise RuntimeError("Invalid version %s for dependency %s", (version_to_str(version), name))
+
+    #Given preference to installing from local cache;
+    #Otherwise download from server.
+    install_dep_from_local(name, version) \
+    or install_dep_from_server(client, name, version)
+
+    os.symlink("_actual/" + name + "-" + version_to_str(version), "_deps/" + name)
+
+def install_dep_from_local(name, version):
+    local_path = "_deps_tmp/_actual/" + name + "-" + version_to_str(version)
+
+    if os.path.exists(local_path):  #Local cache exists.
+        print "Already installed version %s of %s:" % (version_to_str(version), name)
+        install_path = "_deps/_actual/" + name + "-" + version_to_str(version)
+        shutil.move(local_path, install_path)
+        return True
+    else:  #No local cache found.
+        return False
+
+def install_dep_from_server(client, name, version):
     print "Downloading version %s of %s:" % (version_to_str(version), name)
     install_path = "_deps/_actual/" + name + "-" + version_to_str(version)
     os.mkdir(install_path)
@@ -211,7 +231,7 @@ def install_dep(client, name, version):
     pull(client, version_path + "/dep.tar.gz", install_path + "/dep.tar.gz")
     os.system("cd " + install_path + " && tar xzf dep.tar.gz")
     os.remove(install_path + "/dep.tar.gz")
-    os.symlink("_actual/" + name + "-" + version_to_str(version), "_deps/" + name)
+    return True
 
 def get_remote_file_lines(client, filename):
     stdin, stdout, stderr = client.exec_command("cat %s" % filename)
@@ -243,7 +263,10 @@ def get_all_deps(client, nanny_file):
     return deps
 
 def deps(client, args):
-    shutil.rmtree("_deps", ignore_errors=True)
+    if os.path.exists("_deps"):
+        #Temporarily retain any state from the previous `nanny deps` execution.
+        shutil.move("_deps", "_deps_tmp")
+
     os.mkdir("_deps")    
     os.mkdir("_deps/_actual")
     touch("_deps/__init__.py")
@@ -257,6 +280,8 @@ def deps(client, args):
         install_dep(client, name, version)
     if os.path.exists("project.clj"):
         os.system("lein deps")
+
+    shutil.rmtree("_deps_tmp", ignore_errors=True)
 
 def get_child_info(file_path):
     lines = get_substance_lines(file_path)
@@ -335,8 +360,8 @@ def list_available(client, args):
 def print_help(client, args):
     print "Available commands:"
     print ""
-    print "deps: Download all dependencies listed in NANNY file and write them to _deps/ folder. This command"
-    print "\twill delete the _deps folder before running."
+    print "deps: Download outdated dependencies listed in NANNY file and write them to _deps/ folder. If _deps/ " 
+    print "\tfolder is missing, then every dependency will be downloaded."
     print ""
     print "push [childname] {major.minor.revision} [message]: Upload a new version of this child. {childname} is optional,"
     print "\tyou only need to specify it if your CHILD file has multiple entries. [message] is required and should be a description"
