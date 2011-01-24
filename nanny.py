@@ -270,16 +270,15 @@ def get_all_deps(client, nanny_file):
 def deps(client, args):
     shutil.rmtree("_deps_tmp", ignore_errors=True)
 
-
     if not os.path.exists("NANNY"):
         raise NannyFileNotFound("No NANNY file found. Aborting.")
 
-    if not os.path.exists("_deps/.contents_valid"):
-        shutil.rmtree("_deps", ignore_errors=True)
-
-    if os.path.exists("_deps"):
+    if os.path.exists("_deps/.contents_valid"):
         #Temporarily retain any state from the previous `nanny deps` execution.
         shutil.move("_deps", "_deps_tmp")
+    else:
+        #Folder is corrupt or non-existent. Delete it.
+        shutil.rmtree("_deps", ignore_errors=True)
 
     os.mkdir("_deps")
     os.mkdir("_deps/_actual")
