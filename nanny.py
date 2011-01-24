@@ -263,6 +263,11 @@ def get_all_deps(client, nanny_file):
     return deps
 
 def deps(client, args):
+    shutil.rmtree("_deps_tmp", ignore_errors=True)
+
+    if not os.path.exists("_deps/.contents_valid"):
+        shutil.rmtree("_deps", ignore_errors=True)
+
     if os.path.exists("_deps"):
         #Temporarily retain any state from the previous `nanny deps` execution.
         shutil.move("_deps", "_deps_tmp")
@@ -281,7 +286,13 @@ def deps(client, args):
     if os.path.exists("project.clj"):
         os.system("lein deps")
 
+    touch("_deps/.contents_valid")
+
     shutil.rmtree("_deps_tmp", ignore_errors=True)
+
+def clean(client, args):
+    shutil.rmtree("_deps_tmp", ignore_errors=True)
+    shutil.rmtree("_deps", ignore_errors=True)
 
 def get_child_info(file_path):
     lines = get_substance_lines(file_path)
@@ -378,6 +389,8 @@ def print_help(client, args):
     print "history [childname] {limit}: Print the version messages for the last {limit} versions of [childname]."
     print "\tIf limit is not specified, the entire version history will be printed."
     print ""
+    print "clean: Delete local cache of dependencies."
+    print ""
     print "versions {childname}: Print the versions available for {childname} in the repository"
     print ""
     print "stage stagedir [childname]: A 'dry run' of a push. Packages up the package into {stagedir}."
@@ -453,7 +466,7 @@ def push(client, args):
 
 
 def main():
-    commands = {"deps": deps, "remote-version": remote_version, "push": push, 
+    commands = {"deps": deps, "remote-version": remote_version, "push": push, "clean": clean,
                 "versions": versions, "list": list_available, "stage": stage, "info": child_information, "history": child_history, "help": print_help}
     sys.argv.pop(0) #remove filename
 
