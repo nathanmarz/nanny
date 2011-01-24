@@ -25,7 +25,7 @@ try:
         from paramiko import SSHClient
 except Exception, e:
     from paramiko import SSHClient
-    
+
 
 from optparse import OptionParser
 from ConfigParser import SafeConfigParser
@@ -36,10 +36,9 @@ import os
 import subprocess
 import shutil
 
-
 nanny_file = expanduser('~/.nanny')
 if not exists(nanny_file):
-    raise OSError, "File does not exist %s" % nanny_file 
+    raise OSError, "File does not exist %s" % nanny_file
 
 parser = SafeConfigParser()
 parser.read(expanduser('~/.nanny'))
@@ -60,9 +59,15 @@ TODO: should lock the repository
 class FailedSyscallError(Exception):
     def __init__(self, value):
         self.value = value
-        
+
     def __str__(self):
         return repr(self.value)
+
+class NannyFileNotFound(Exception):
+       def __init__(self, value):
+           self.value = value
+       def __str__(self):
+           return repr(self.value)
 
 #raises an exception if the command returns non-zero
 def syscall_execget(command):
@@ -87,7 +92,7 @@ def spit(filename, content):
     f.close()
 
 def get_substance(strs):
-    return filter(lambda x: len(x) > 0, map(lambda x: x.strip(), strs)) 
+    return filter(lambda x: len(x) > 0, map(lambda x: x.strip(), strs))
 
 def get_substance_lines(file_path):
     f = open(file_path, "r")
@@ -100,7 +105,7 @@ def parse_version(raw):
     if len(parsed) != 3:
         raise RuntimeError("Bad version " + raw)
     return map(int, parsed)
-    
+
 def compare_versions(v1, v2):
     cv1 = list(v1)
     cv2 = list(v2)
@@ -114,7 +119,7 @@ def compare_versions(v1, v2):
 
 def version_to_str(version):
     return ".".join(map(str,version))
-    
+
 def touch(file_path):
     open(file_path, "a").close()
 
@@ -142,11 +147,11 @@ def parse_nanny_lines(client, substancelines):
         if v not in allv:
             raise RuntimeError("Invalid version %s for dependency %s", (version_to_str(v), name))
     return ret
-    
+
 def parse_nanny_file(client, filename):
     deps_raw = get_substance_lines(filename)
     return parse_nanny_lines(client, deps_raw)
-    
+
 def versions(client, args):
     print "Getting versions for " + args[0] + ":\n"
     allv = map(version_to_str, get_versions(client, args[0]))
@@ -226,7 +231,7 @@ def install_dep_from_server(client, name, version):
     print "Downloading version %s of %s:" % (version_to_str(version), name)
     install_path = "_deps/_actual/" + name + "-" + version_to_str(version)
     os.mkdir(install_path)
-    
+
     version_path = get_remote_child_path(name, version)
     pull(client, version_path + "/dep.tar.gz", install_path + "/dep.tar.gz")
     os.system("cd " + install_path + " && tar xzf dep.tar.gz")
@@ -236,14 +241,14 @@ def install_dep_from_server(client, name, version):
 def get_remote_file_lines(client, filename):
     stdin, stdout, stderr = client.exec_command("cat %s" % filename)
     return stdout.readlines()
-    
+
 def get_remote_file_contents(client, filename):
     lines = get_remote_file_lines(client, filename)
     return "".join(lines)
 
 def get_deps(client, name, version, depsmap):
     remote_path = get_remote_child_path(name, version)
-    new_deps = parse_nanny_lines(client, get_remote_file_lines(client, "%s/NANNY" % remote_path))    
+    new_deps = parse_nanny_lines(client, get_remote_file_lines(client, "%s/NANNY" % remote_path))
     print name + " has dependencies " + str(new_deps)
     for dep, v in new_deps.items():
         if dep in depsmap:
@@ -265,6 +270,10 @@ def get_all_deps(client, nanny_file):
 def deps(client, args):
     shutil.rmtree("_deps_tmp", ignore_errors=True)
 
+
+    if not os.path.exists("NANNY"):
+        raise NannyFileNotFound("No NANNY file found. Aborting.")
+
     if not os.path.exists("_deps/.contents_valid"):
         shutil.rmtree("_deps", ignore_errors=True)
 
@@ -272,15 +281,15 @@ def deps(client, args):
         #Temporarily retain any state from the previous `nanny deps` execution.
         shutil.move("_deps", "_deps_tmp")
 
-    os.mkdir("_deps")    
+    os.mkdir("_deps")
     os.mkdir("_deps/_actual")
     touch("_deps/__init__.py")
     deps = get_all_deps(client, "NANNY")
-    
+
     print "All deps:"
     for name, version in deps.items():
         print "\t%s\t%s" % (name, version_to_str(version))
-    
+
     for name, version in deps.items():
         install_dep(client, name, version)
     if os.path.exists("project.clj"):
@@ -318,16 +327,16 @@ def child_information(client, args):
         version = parse_version(args[1])
     else:
         version = allv[0]
-    
+
     if version not in allv:
         print "Versions %s of %s does not exist in the repository" % (version_to_str(version), childname)
-        
+
     remotepath = get_remote_child_path(childname, version)
     packagemsg = get_remote_file_contents(client, remotepath + "/PACKAGE-MSG")
     versionlogs = get_remote_file_contents(client, remotepath + "/VERSIONLOGS")
     print "--------------------------------------------------------------------------"
     print "Version control logs:"
-    print ""    
+    print ""
     print versionlogs
     print ""
     print "--------------------------------------------------------------------------"
@@ -345,10 +354,10 @@ def child_history(client, args):
         limit = min(int(args[1]), len(allv))
     else:
         limit = len(allv)
-    
+
     for i in range(0, limit):
         v = allv[i]
-        remotepath = get_remote_child_path(childname, v)   
+        remotepath = get_remote_child_path(childname, v)
         packagemsg = get_remote_file_contents(client, remotepath + "/PACKAGE-MSG")
         print version_to_str(v) + ": " + packagemsg
         print ""
@@ -371,7 +380,7 @@ def list_available(client, args):
 def print_help(client, args):
     print "Available commands:"
     print ""
-    print "deps: Download outdated dependencies listed in NANNY file and write them to _deps/ folder. If _deps/ " 
+    print "deps: Download outdated dependencies listed in NANNY file and write them to _deps/ folder. If _deps/ "
     print "\tfolder is missing, then every dependency will be downloaded."
     print ""
     print "push [childname] {major.minor.revision} [message]: Upload a new version of this child. {childname} is optional,"
@@ -412,7 +421,7 @@ def stage(client, args):
     else:
         name = args[1]
     makerscript = child_pairs[name]
-    
+
     os.mkdir(stagedir)
     os.system("./%s %s" % (makerscript, stagedir))
 
@@ -437,11 +446,11 @@ def push(client, args):
     if len(curr_versions) > 0 and compare_versions(curr_versions[-1], version) >= 0:
         raise RuntimeError("Cannot deploy a less than or equal version than current version " +
                         version_to_str(curr_versions[-1]))
-    
+
     shutil.rmtree("/tmp/_nanny", ignore_errors=True)
     os.mkdir("/tmp/_nanny")
     os.system("./%s /tmp/_nanny/" % makerscript)
-    
+
     remote_mkdir(client, REPOSITORY_PATH + "/" + name)
     remote_tmp_path = "/tmp/_nanny-" + name
     client.exec_command("rm -rf " + remote_tmp_path)
@@ -449,7 +458,7 @@ def push(client, args):
 
     if os.path.exists("/tmp/_nanny/NANNY"):
         put(client, "/tmp/_nanny/NANNY", remote_tmp_path + "/NANNY")
-        os.remove("/tmp/_nanny/NANNY")        
+        os.remove("/tmp/_nanny/NANNY")
     elif os.path.exists("NANNY"):
         put(client, "NANNY", remote_tmp_path + "/NANNY")
 
@@ -483,11 +492,17 @@ def main():
             client = SSHClient()
             client.load_system_host_keys()
             client.connect(REPOSITORY_HOST, username=REPOSITORY_USER, key_filename=REPOSITORY_KEY)
-    
-        commands[command](client, sys.argv)
-        if command != "help":
-            print ""
-            print command + " [SUCCESSFUL]"
+
+        try:
+            commands[command](client, sys.argv)
+            if command != "help":
+                print ""
+                print command + " [SUCCESSFUL]"
+
+        except Exception, e:
+            print e
+            print command + " [FAILED]"
+
     finally:
         if client is not None:
             client.close()
